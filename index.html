@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>MR TIBBS · Garden of Reckoning</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#10131f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mr Tibbs">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root{
     --gold:#ffd166; --lantern:#ff8c3b; --paper:#fff4e0;
@@ -262,9 +269,20 @@
 /* ============================================================
    RENDERER / SCENE
 ============================================================ */
-const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
+const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+  (navigator.maxTouchPoints > 1 && Math.min(innerWidth, innerHeight) < 900);
+const MAX_DPR = IS_MOBILE ? 1.6 : 2;
+let resScale = 1;
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: !IS_MOBILE || (window.devicePixelRatio||1) < 1.5,
+  powerPreference: 'high-performance',
+});
+function applyRes(){
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, MAX_DPR) * resScale);
+  renderer.setSize(innerWidth, innerHeight);
+}
+applyRes();
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
@@ -281,7 +299,7 @@ const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 200)
 addEventListener('resize', () => {
   camera.aspect = innerWidth/innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+  applyRes();
 });
 
 /* ============================================================
@@ -292,7 +310,7 @@ scene.add(new THREE.HemisphereLight(0x6a7ab8, 0x1a1426, 0.75));
 const moonLight = new THREE.DirectionalLight(0xbfd0ff, 1.2);
 moonLight.position.set(-18, 30, -12);
 moonLight.castShadow = true;
-moonLight.shadow.mapSize.set(2048, 2048);
+moonLight.shadow.mapSize.set(IS_MOBILE ? 1024 : 2048, IS_MOBILE ? 1024 : 2048);
 moonLight.shadow.camera.left = -26; moonLight.shadow.camera.right = 26;
 moonLight.shadow.camera.top = 26;  moonLight.shadow.camera.bottom = -26;
 moonLight.shadow.camera.far = 80;
@@ -383,7 +401,8 @@ const ARENA = 15;
 
 /* low-poly rolling terrain with vertex colours */
 (function terrain(){
-  const geo = new THREE.PlaneGeometry(110, 110, 72, 72);
+  const segs = IS_MOBILE ? 44 : 72;
+  const geo = new THREE.PlaneGeometry(110, 110, segs, segs);
   geo.rotateX(-Math.PI/2);
   const pos = geo.attributes.position;
   const colA = new THREE.Color(0x2c5232), colB = new THREE.Color(0x35633c), colC = new THREE.Color(0x274a2e);
@@ -425,7 +444,7 @@ const ARENA = 15;
 const tuftGeo = new THREE.ConeGeometry(0.14, 0.55, 5);
 const tuftMatA = new THREE.MeshStandardMaterial({color:0x3a6e42, roughness:1, flatShading:true});
 const tuftMatB = new THREE.MeshStandardMaterial({color:0x2f5a36, roughness:1, flatShading:true});
-for (let i=0;i<160;i++){
+for (let i=0;i<(IS_MOBILE?70:160);i++){
   const t = new THREE.Mesh(tuftGeo, Math.random()<.5?tuftMatA:tuftMatB);
   const a = Math.random()*Math.PI*2, r = 3 + Math.random()*26;
   t.position.set(Math.cos(a)*r, 0.24, Math.sin(a)*r);
@@ -437,7 +456,7 @@ for (let i=0;i<160;i++){
 /* little glowing flowers */
 const petalMats = [0xfff4e0, 0xf2b5d4, 0xffd166].map(c=>
   new THREE.MeshStandardMaterial({color:c, roughness:.7, emissive:c, emissiveIntensity:0.18}));
-for (let i=0;i<26;i++){
+for (let i=0;i<(IS_MOBILE?14:26);i++){
   const f = new THREE.Group();
   const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.025,0.3,5), tuftMatB);
   stem.position.y = 0.15; f.add(stem);
@@ -457,7 +476,7 @@ for (let i=0;i<7;i++){
   scene.add(s);
 }
 /* fireflies */
-for (let i=0;i<16;i++){
+for (let i=0;i<(IS_MOBILE?8:16);i++){
   const sp = makeGlow(0xc8ff8a, 0.5, 0.8);
   scene.add(sp);
   fireflies.push({sprite:sp, cx:(Math.random()-.5)*26, cz:(Math.random()-.5)*26,
@@ -475,7 +494,7 @@ for (let i=0;i<16;i++){
       const s = new THREE.Mesh(slat, M.fence);
       if (axis===0) s.position.set(p, 0.75, sign*F);
       else { s.position.set(sign*F, 0.75, p); s.rotation.y = Math.PI/2; }
-      s.castShadow = true; scene.add(s);
+      scene.add(s);
     }
     for (const h of [0.55, 1.1]){
       const r = new THREE.Mesh(rail, M.fence);
@@ -522,7 +541,7 @@ moonHalo.position.copy(moon.position);
 scene.add(moonHalo);
 
 (function stars(){
-  const n = 350, pos = new Float32Array(n*3);
+  const n = IS_MOBILE ? 180 : 350, pos = new Float32Array(n*3);
   for (let i=0;i<n;i++){
     const a = Math.random()*Math.PI*2, e = Math.random()*Math.PI*0.45, r = 150;
     pos[i*3] = Math.cos(a)*Math.cos(e)*r;
@@ -1214,6 +1233,7 @@ function killEnemy(e){
 }
 
 function spawnSpark(pos, color, scale, vel, life){
+  if (S.particles.length > (IS_MOBILE ? 55 : 140)) return;
   const s = makeGlow(color, scale, 1);
   s.position.copy(pos);
   scene.add(s);
@@ -1364,10 +1384,20 @@ const clock = new THREE.Clock();
 const camTarget = new THREE.Vector3();
 const tmpV = new THREE.Vector3();
 
+let fpsTimer = 0, fpsFrames = 0;
 function animate(){
   requestAnimationFrame(animate);
   let dt = Math.min(clock.getDelta(), 0.05);
   const realDt = dt;
+
+  // adaptive resolution — keeps it smooth on weaker devices
+  fpsTimer += realDt; fpsFrames++;
+  if (fpsTimer >= 2){
+    const fps = fpsFrames / fpsTimer;
+    if (fps < 45 && resScale > 0.6){ resScale = Math.max(0.6, resScale - 0.15); applyRes(); }
+    else if (fps > 56 && resScale < 1){ resScale = Math.min(1, resScale + 0.1); applyRes(); }
+    fpsTimer = 0; fpsFrames = 0;
+  }
   if (S.slowmo > 0){ S.slowmo -= realDt; dt *= 0.25; }
   if (S.mode === 'play') update(dt, realDt);
   idleAnimate();
@@ -1843,5 +1873,9 @@ try{
   window.TIBBS_UI.setOffline('Firebase failed to load: ' + (err.message || err));
 }
 </script></script>
+<script>
+if ('serviceWorker' in navigator)
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+</script>
 </body>
 </html>
