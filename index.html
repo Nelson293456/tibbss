@@ -1,0 +1,1847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>MR TIBBS · Garden of Reckoning</title>
+<style>
+  :root{
+    --gold:#ffd166; --lantern:#ff8c3b; --paper:#fff4e0;
+    --night:#10131f; --danger:#ff4d6d; --rage:#7aff8a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;overflow:hidden;background:var(--night);
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    -webkit-user-select:none;user-select:none;touch-action:none;
+    -webkit-tap-highlight-color:transparent;}
+  canvas{display:block;}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:5;}
+  .score-block{position:absolute;top:max(14px,env(safe-area-inset-top));left:18px;color:var(--paper);}
+  #score{font-family:Impact,"Arial Black",sans-serif;font-size:clamp(30px,5vw,44px);
+    text-shadow:0 3px 12px rgba(0,0,0,.7);letter-spacing:.02em;}
+  .score-label{font-size:10px;letter-spacing:.3em;opacity:.6;font-weight:700;}
+  #threat{font-size:11px;letter-spacing:.2em;color:var(--lantern);font-weight:800;margin-top:4px;}
+  #lives{position:absolute;top:max(16px,env(safe-area-inset-top));right:18px;
+    font-size:clamp(15px,2.6vw,20px);letter-spacing:2px;text-align:right;
+    filter:drop-shadow(0 2px 6px rgba(0,0,0,.8));}
+  #lives .label{font-size:10px;letter-spacing:.3em;color:var(--paper);opacity:.6;font-weight:700;display:block;margin-top:2px;}
+  #combo{position:absolute;top:max(14px,env(safe-area-inset-top));left:50%;transform:translateX(-50%) scale(0);
+    font-family:Impact,"Arial Black",sans-serif;color:var(--lantern);
+    font-size:clamp(24px,5vw,40px);text-shadow:0 3px 0 rgba(0,0,0,.5);
+    transition:transform .15s cubic-bezier(.2,1.8,.4,1);}
+  #combo.on{transform:translateX(-50%) scale(1);}
+  #rageBar{position:absolute;top:max(58px,calc(env(safe-area-inset-top) + 46px));left:50%;
+    transform:translateX(-50%);width:180px;height:8px;border-radius:4px;
+    background:rgba(255,255,255,.15);display:none;overflow:hidden;}
+  #rageFill{height:100%;width:100%;background:linear-gradient(90deg,var(--rage),#bfffc7);}
+  #rageBar .rlabel{position:absolute;top:-16px;left:50%;transform:translateX(-50%);
+    font-size:10px;letter-spacing:.3em;color:var(--rage);font-weight:800;}
+  #muteBtn{position:fixed;top:max(60px,calc(env(safe-area-inset-top)+48px));right:18px;z-index:9;
+    pointer-events:auto;background:rgba(255,244,224,.1);border:1px solid rgba(255,244,224,.25);
+    color:var(--paper);border-radius:8px;width:38px;height:38px;font-size:17px;cursor:pointer;}
+
+  .floater{position:absolute;font-family:Impact,"Arial Black",sans-serif;
+    color:var(--gold);font-size:22px;text-shadow:0 2px 0 rgba(0,0,0,.6);
+    animation:floatUp 1s ease-out forwards;white-space:nowrap;transform:translate(-50%,-50%);}
+  @keyframes floatUp{
+    0%{opacity:0;margin-top:0;scale:.6;}
+    15%{opacity:1;scale:1.15;}
+    100%{opacity:0;margin-top:-70px;scale:1;}
+  }
+
+  #factBanner{position:fixed;top:max(60px,calc(env(safe-area-inset-top) + 48px));left:50%;
+    transform:translateX(-50%) translateY(-260%);
+    background:var(--paper);color:#1a1430;font-weight:700;
+    font-size:clamp(13px,2.6vw,16px);padding:11px 20px;border-radius:8px;
+    max-width:min(540px,92vw);box-shadow:0 10px 40px rgba(0,0,0,.6);
+    border-left:6px solid var(--lantern);text-align:center;z-index:6;
+    transition:transform .5s cubic-bezier(.2,1.4,.4,1);pointer-events:none;}
+  #factBanner.show{transform:translateX(-50%) translateY(0);}
+  #factBanner .tag{display:block;font-size:10px;letter-spacing:.32em;color:var(--lantern);margin-bottom:3px;}
+  #factBanner.boss{border-left-color:var(--danger);}
+  #factBanner.boss .tag{color:var(--danger);}
+
+  /* ---------- screens ---------- */
+  .screen{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;color:var(--paper);
+    background:radial-gradient(ellipse at 50% 35%, rgba(43,29,79,.55), rgba(10,8,20,.9));
+    backdrop-filter:blur(3px);overflow-y:auto;padding:30px 14px;}
+  .hidden{display:none!important;}
+  .title{font-family:Impact,"Arial Black",sans-serif;
+    font-size:clamp(40px,9.5vw,100px);letter-spacing:.03em;line-height:.92;
+    color:var(--gold);transform:rotate(-2deg);
+    text-shadow:0 5px 0 #7a4200, 0 12px 40px rgba(0,0,0,.8);}
+  .subtitle{font-size:clamp(12px,2.8vw,20px);letter-spacing:.4em;text-transform:uppercase;
+    color:var(--lantern);margin-top:10px;font-weight:700;}
+  .legend-line{max-width:540px;margin:18px 18px 0;font-size:clamp(13px,2.5vw,16px);
+    font-style:italic;opacity:.92;line-height:1.55;}
+  .btn{pointer-events:auto;cursor:pointer;margin-top:20px;
+    font-family:Impact,"Arial Black",sans-serif;
+    font-size:clamp(19px,3.6vw,28px);letter-spacing:.1em;color:#1a1430;
+    background:var(--gold);border:none;border-radius:8px;padding:14px 44px;
+    box-shadow:0 6px 0 #7a4200, 0 14px 40px rgba(0,0,0,.5);
+    transition:transform .08s, box-shadow .08s;}
+  .btn:active{transform:translateY(5px);box-shadow:0 1px 0 #7a4200;}
+  .btn.small{font-size:14px;padding:10px 20px;box-shadow:0 4px 0 #7a4200;margin-top:10px;}
+  .btn.ghost{background:transparent;color:var(--paper);
+    border:2px solid rgba(255,244,224,.4);box-shadow:none;}
+  .howto{margin-top:18px;font-size:clamp(10px,2vw,13px);letter-spacing:.12em;
+    text-transform:uppercase;opacity:.6;line-height:2;}
+  kbd{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);
+    border-radius:4px;padding:1px 7px;}
+  .final-score{font-family:Impact,"Arial Black",sans-serif;
+    font-size:clamp(50px,11vw,110px);text-shadow:0 6px 0 rgba(0,0,0,.5);}
+  .final-label{letter-spacing:.32em;text-transform:uppercase;color:var(--lantern);
+    font-weight:700;font-size:clamp(10px,2.2vw,14px);margin-top:6px;}
+
+  /* ---------- auth + leaderboard ---------- */
+  .panel-row{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;
+    align-items:flex-start;margin-top:14px;max-width:880px;width:100%;}
+  .panel{background:rgba(10,8,20,.55);border:1px solid rgba(255,209,102,.25);
+    border-radius:12px;padding:16px 18px;min-width:min(300px,90vw);flex:1;
+    pointer-events:auto;}
+  .panel h3{font-family:Impact,"Arial Black",sans-serif;letter-spacing:.15em;
+    color:var(--gold);font-size:16px;margin-bottom:10px;}
+  #guestName{width:100%;padding:11px 12px;border-radius:8px;margin-bottom:8px;
+    border:1px solid rgba(255,244,224,.3);background:rgba(255,255,255,.08);
+    color:var(--paper);font-size:15px;letter-spacing:.08em;text-align:center;
+    font-family:inherit;font-weight:700;text-transform:uppercase;outline:none;}
+  #guestName::placeholder{color:rgba(255,244,224,.35);}
+  .auth-btn{display:block;width:100%;margin-top:8px;padding:11px;border-radius:8px;
+    border:none;cursor:pointer;font-weight:800;font-size:14px;letter-spacing:.06em;
+    font-family:inherit;}
+  #guestBtn{background:var(--gold);color:#1a1430;}
+  #googleBtn{background:#fff;color:#1f2330;}
+  #signOutBtn{background:transparent;color:var(--paper);border:1px solid rgba(255,244,224,.35);}
+  .auth-note{font-size:11px;opacity:.55;margin-top:10px;line-height:1.6;}
+  #signedInAs{font-size:15px;margin-bottom:4px;}
+  #signedInAs b{color:var(--gold);}
+  #board{list-style:none;text-align:left;max-height:240px;overflow-y:auto;}
+  #board li{display:flex;justify-content:space-between;gap:10px;padding:7px 8px;
+    border-bottom:1px solid rgba(255,244,224,.1);font-size:14px;align-items:baseline;}
+  #board li .rank{color:var(--lantern);font-family:Impact,sans-serif;width:26px;}
+  #board li .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;}
+  #board li .sc{font-family:Impact,"Arial Black",sans-serif;color:var(--gold);}
+  #board li.me{background:rgba(255,209,102,.14);border-radius:6px;}
+  #board .empty{opacity:.5;font-size:13px;padding:8px;}
+  #saveStatus{font-size:13px;margin-top:10px;color:var(--rage);font-weight:700;min-height:18px;}
+
+  /* ---------- touch controls ---------- */
+  #joy{position:fixed;width:120px;height:120px;border-radius:50%;
+    border:2px solid rgba(255,244,224,.25);background:rgba(255,244,224,.06);
+    z-index:7;display:none;pointer-events:none;}
+  #joyKnob{position:absolute;left:50%;top:50%;width:52px;height:52px;border-radius:50%;
+    background:rgba(255,209,102,.85);transform:translate(-50%,-50%);
+    box-shadow:0 4px 14px rgba(0,0,0,.5);}
+  #kickBtn,#dashBtn{position:fixed;border-radius:50%;border:none;z-index:7;display:none;
+    font-family:Impact,"Arial Black",sans-serif;color:#1a1430;letter-spacing:.05em;}
+  #kickBtn{right:max(22px,env(safe-area-inset-right));
+    bottom:max(26px,env(safe-area-inset-bottom));width:96px;height:96px;font-size:17px;
+    background:radial-gradient(circle at 35% 30%, #ffe49a, var(--gold));
+    box-shadow:0 6px 0 #7a4200, 0 12px 30px rgba(0,0,0,.6);}
+  #dashBtn{right:max(128px,calc(env(safe-area-inset-right) + 106px));
+    bottom:max(40px,calc(env(safe-area-inset-bottom) + 14px));width:68px;height:68px;font-size:13px;
+    background:radial-gradient(circle at 35% 30%, #c2e8ff, #7fb8e8);
+    box-shadow:0 5px 0 #2d5a80, 0 10px 26px rgba(0,0,0,.6);}
+  #kickBtn:active,#dashBtn:active{transform:translateY(4px);}
+  body.touch #kickBtn, body.touch #dashBtn{display:block;}
+
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:4;
+    box-shadow:inset 0 0 180px rgba(0,0,0,.55);}
+  #hurtFlash{position:fixed;inset:0;pointer-events:none;z-index:8;
+    background:radial-gradient(ellipse, transparent 40%, rgba(255,40,70,.45));
+    opacity:0;transition:opacity .1s;}
+  #rageGlow{position:fixed;inset:0;pointer-events:none;z-index:4;
+    box-shadow:inset 0 0 120px rgba(122,255,138,.35);opacity:0;transition:opacity .4s;}
+
+  #bossBar{position:fixed;bottom:max(18px,env(safe-area-inset-bottom));left:50%;
+    transform:translateX(-50%);width:min(420px,80vw);z-index:6;display:none;text-align:center;}
+  #bossBar .bname{font-family:Impact,"Arial Black",sans-serif;color:var(--danger);
+    letter-spacing:.25em;font-size:14px;margin-bottom:5px;text-shadow:0 2px 6px rgba(0,0,0,.8);}
+  #bossBar .track{height:12px;background:rgba(0,0,0,.55);border:1px solid rgba(255,77,109,.6);
+    border-radius:6px;overflow:hidden;}
+  #bossHp{height:100%;width:100%;background:linear-gradient(90deg,#ff4d6d,#ff8c3b);
+    transition:width .15s;}
+</style>
+</head>
+<body>
+<div id="vignette"></div>
+<div id="rageGlow"></div>
+<div id="hurtFlash"></div>
+
+<div id="hud">
+  <div class="score-block">
+    <div id="score">0</div>
+    <div class="score-label">LEGEND POINTS</div>
+    <div id="threat">THREAT LVL 1</div>
+  </div>
+  <div id="lives"><span id="paws"></span><span class="label">NINE LIVES</span></div>
+  <div id="combo"></div>
+  <div id="rageBar"><span class="rlabel">CATNIP RAGE</span><div id="rageFill"></div></div>
+</div>
+<button id="muteBtn" title="mute">🔊</button>
+
+<div id="factBanner"><span class="tag" id="factTag">VERIFIED TIBBS FACT</span><span id="factText"></span></div>
+
+<div id="bossBar">
+  <div class="bname">⚠ THE BATH ⚠</div>
+  <div class="track"><div id="bossHp"></div></div>
+</div>
+
+<div id="joy"><div id="joyKnob"></div></div>
+<button id="kickBtn">KICK</button>
+<button id="dashBtn">DASH</button>
+
+<!-- ================= MENU ================= -->
+<div class="screen" id="menu">
+  <div class="title">MR&nbsp;TIBBS</div>
+  <div class="subtitle">Garden of Reckoning</div>
+  <div class="legend-line">Tabby of coat. White of blaze. Zero of mercy.<br>
+    Cucumbers, vacuum-bots, spray bottles, smug dogs — and somewhere out there,
+    <b>The Bath</b> is coming.</div>
+
+  <button class="btn" id="startBtn">BEGIN THE LEGEND</button>
+
+  <div class="panel-row">
+    <div class="panel" id="authPanel">
+      <h3>JOIN THE HALL OF LEGENDS</h3>
+      <div id="authSignedOut">
+        <input id="guestName" maxlength="14" placeholder="YOUR CALLSIGN" autocomplete="off">
+        <button class="auth-btn" id="guestBtn">PLAY AS GUEST</button>
+        <button class="auth-btn" id="googleBtn">SIGN IN WITH GOOGLE</button>
+        <div class="auth-note" id="authNote">Sign in to post your score to the global leaderboard.</div>
+      </div>
+      <div id="authSignedIn" class="hidden">
+        <div id="signedInAs">Enlisted as <b id="playerName"></b></div>
+        <button class="auth-btn" id="signOutBtn">SIGN OUT</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>🏆 HALL OF LEGENDS</h3>
+      <ol id="board"><li class="empty">Connecting to the hall…</li></ol>
+    </div>
+  </div>
+
+  <div class="howto">
+    <kbd>WASD</kbd> move · <kbd>SPACE</kbd>/click kick · <kbd>SHIFT</kbd> dash · <kbd>P</kbd> pause<br>
+    touch: left thumb moves · gold KICK · blue DASH<br>
+    grab catnip 🌿 for rage · milk 🥛 restores a life · the golden fish judges all
+  </div>
+</div>
+
+<!-- ================= PAUSE ================= -->
+<div class="screen hidden" id="pause">
+  <div class="title" style="font-size:clamp(34px,7vw,70px)">PAUSED</div>
+  <div class="legend-line">Mr Tibbs is taking a brief, dignified bath of sunlight.</div>
+  <button class="btn" id="resumeBtn">RESUME</button>
+  <button class="btn small ghost" id="quitBtn">ABANDON RUN</button>
+</div>
+
+<!-- ================= GAME OVER ================= -->
+<div class="screen hidden" id="gameover">
+  <div class="final-label">The legend rests… for now</div>
+  <div class="final-score" id="finalScore">0</div>
+  <div class="final-label" id="finalStats"></div>
+  <div id="saveStatus"></div>
+  <div class="panel" style="max-width:380px;width:90%;margin-top:14px;">
+    <h3>🏆 HALL OF LEGENDS</h3>
+    <ol id="boardOver"><li class="empty">…</li></ol>
+  </div>
+  <div class="legend-line" id="finalFact"></div>
+  <button class="btn" id="retryBtn">RISE AGAIN</button>
+  <button class="btn small ghost" id="menuBtn">BACK TO MENU</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+
+/* ============================================================
+   RENDERER / SCENE
+============================================================ */
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.18;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x10131f);
+scene.fog = new THREE.Fog(0x141a2e, 28, 72);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 200);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ============================================================
+   LIGHTING
+============================================================ */
+scene.add(new THREE.HemisphereLight(0x6a7ab8, 0x1a1426, 0.75));
+
+const moonLight = new THREE.DirectionalLight(0xbfd0ff, 1.2);
+moonLight.position.set(-18, 30, -12);
+moonLight.castShadow = true;
+moonLight.shadow.mapSize.set(2048, 2048);
+moonLight.shadow.camera.left = -26; moonLight.shadow.camera.right = 26;
+moonLight.shadow.camera.top = 26;  moonLight.shadow.camera.bottom = -26;
+moonLight.shadow.camera.far = 80;
+moonLight.shadow.bias = -0.0008;
+scene.add(moonLight);
+
+const warmA = new THREE.PointLight(0xff9a40, 1.5, 26, 2);
+warmA.position.set(11, 4.5, 11); scene.add(warmA);
+const warmB = new THREE.PointLight(0xff9a40, 1.5, 26, 2);
+warmB.position.set(-11, 4.5, -11); scene.add(warmB);
+
+// rage aura light (off by default)
+const rageLight = new THREE.PointLight(0x7aff8a, 0, 9, 2);
+scene.add(rageLight);
+
+/* ============================================================
+   MATERIALS — tuned to the real Mr Tibbs
+============================================================ */
+const M = {
+  grass:  new THREE.MeshStandardMaterial({color:0x274a2e, roughness:1}),
+  grassB: new THREE.MeshStandardMaterial({color:0x2f5a36, roughness:1}),
+  dirt:   new THREE.MeshStandardMaterial({color:0x3a2c22, roughness:1}),
+  fence:  new THREE.MeshStandardMaterial({color:0x5a4030, roughness:.9, flatShading:true}),
+  // tabby coat
+  tabby:  new THREE.MeshStandardMaterial({color:0x9a8a72, roughness:.85}),
+  tabbyD: new THREE.MeshStandardMaterial({color:0x6b5d4c, roughness:.85}),
+  white:  new THREE.MeshStandardMaterial({color:0xf4f1ea, roughness:.85}),
+  pink:   new THREE.MeshStandardMaterial({color:0xdf9aa0, roughness:.8}),
+  green:  new THREE.MeshStandardMaterial({color:0x86b06a, roughness:.4, emissive:0x1d2f12, emissiveIntensity:.6}),
+  black:  new THREE.MeshStandardMaterial({color:0x14161c, roughness:.5}),
+  goldM:  new THREE.MeshStandardMaterial({color:0xffd166, roughness:.3, metalness:.7, emissive:0x664400, emissiveIntensity:.4}),
+  cuc:    new THREE.MeshStandardMaterial({color:0x3f8f3a, roughness:.7, flatShading:true}),
+  cucD:   new THREE.MeshStandardMaterial({color:0x2d6b2a, roughness:.7, flatShading:true}),
+  vac:    new THREE.MeshStandardMaterial({color:0x2b2f3a, roughness:.4, metalness:.6}),
+  vacEye: new THREE.MeshStandardMaterial({color:0xff2244, emissive:0xff2244, emissiveIntensity:1.5}),
+  spray:  new THREE.MeshStandardMaterial({color:0x3a7bd5, roughness:.4}),
+  sprayT: new THREE.MeshStandardMaterial({color:0xeeeeee, roughness:.4}),
+  dog:    new THREE.MeshStandardMaterial({color:0x9a6b3f, roughness:.9, flatShading:true}),
+  dogD:   new THREE.MeshStandardMaterial({color:0x7c5430, roughness:.9, flatShading:true}),
+  tub:    new THREE.MeshStandardMaterial({color:0xf2f4f6, roughness:.25}),
+  tubIn:  new THREE.MeshStandardMaterial({color:0xd7dde2, roughness:.3}),
+  water:  new THREE.MeshStandardMaterial({color:0x4aa6d8, roughness:.15, transparent:true, opacity:.85}),
+  bubble: new THREE.MeshStandardMaterial({color:0xffffff, roughness:.1, transparent:true, opacity:.7}),
+  lantern:new THREE.MeshStandardMaterial({color:0xffc070, emissive:0xff8c3b, emissiveIntensity:1.4}),
+  pole:   new THREE.MeshStandardMaterial({color:0x2a2018, roughness:1}),
+  moon:   new THREE.MeshBasicMaterial({color:0xfff4dc}),
+  spark:  new THREE.MeshBasicMaterial({color:0xffd166}),
+  sparkO: new THREE.MeshBasicMaterial({color:0xff8c3b}),
+  sparkG: new THREE.MeshBasicMaterial({color:0x7aff8a}),
+  ring:   new THREE.MeshBasicMaterial({color:0xffd166, transparent:true, side:THREE.DoubleSide}),
+  leaf:   new THREE.MeshStandardMaterial({color:0x2e5d33, roughness:1}),
+  catnip: new THREE.MeshStandardMaterial({color:0x5fd06a, roughness:.6, emissive:0x1a4d1f, emissiveIntensity:.7}),
+  milk:   new THREE.MeshStandardMaterial({color:0xf8f8f8, roughness:.5}),
+  milkB:  new THREE.MeshStandardMaterial({color:0x3a7bd5, roughness:.5}),
+  fishM:  new THREE.MeshStandardMaterial({color:0xffd166, roughness:.2, metalness:.85, emissive:0x885500, emissiveIntensity:.7}),
+  trunk:  new THREE.MeshStandardMaterial({color:0x4a3526, roughness:1}),
+};
+
+/* ---------- procedural textures & glow sprites ---------- */
+function canvasTex(w, h, draw){
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  return new THREE.CanvasTexture(c);
+}
+const glowTex = canvasTex(128, 128, (g,w,h)=>{
+  const r = g.createRadialGradient(64,64,0,64,64,64);
+  r.addColorStop(0,'rgba(255,255,255,1)');
+  r.addColorStop(0.35,'rgba(255,255,255,0.45)');
+  r.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle = r; g.fillRect(0,0,w,h);
+});
+function makeGlow(color, scale, opacity){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({
+    map:glowTex, color, transparent:true,
+    opacity:opacity===undefined?0.8:opacity,
+    blending:THREE.AdditiveBlending, depthWrite:false,
+  }));
+  s.scale.setScalar(scale);
+  return s;
+}
+const fireflies = [];
+
+/* ============================================================
+   GARDEN
+============================================================ */
+const ARENA = 15;
+
+/* low-poly rolling terrain with vertex colours */
+(function terrain(){
+  const geo = new THREE.PlaneGeometry(110, 110, 72, 72);
+  geo.rotateX(-Math.PI/2);
+  const pos = geo.attributes.position;
+  const colA = new THREE.Color(0x2c5232), colB = new THREE.Color(0x35633c), colC = new THREE.Color(0x274a2e);
+  const colors = [];
+  const c = new THREE.Color();
+  for (let i=0;i<pos.count;i++){
+    const x = pos.getX(i), z = pos.getZ(i);
+    const d = Math.max(Math.abs(x), Math.abs(z));
+    const ease = THREE.MathUtils.smoothstep(d, 17, 30);
+    const hill = (Math.sin(x*0.31)*Math.cos(z*0.27) + Math.sin(x*0.13+z*0.17)) * 0.9;
+    pos.setY(i, hill*ease + Math.random()*0.04);
+    c.copy(Math.random()<0.5?colA:colB).lerp(colC, Math.random()*0.35);
+    colors.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    vertexColors:true, flatShading:true, roughness:1}));
+  m.receiveShadow = true;
+  scene.add(m);
+})();
+
+/* sky dome */
+(function sky(){
+  const tex = canvasTex(16, 512, (g)=>{
+    const gr = g.createLinearGradient(0,0,0,512);
+    gr.addColorStop(0, '#070a16');
+    gr.addColorStop(0.45,'#141a36');
+    gr.addColorStop(0.72,'#3a2a58');
+    gr.addColorStop(0.88,'#5e3a5e');
+    gr.addColorStop(1, '#2a2040');
+    g.fillStyle = gr; g.fillRect(0,0,16,512);
+  });
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(175, 24, 16),
+    new THREE.MeshBasicMaterial({map:tex, side:THREE.BackSide, fog:false}));
+  scene.add(dome);
+})();
+
+const tuftGeo = new THREE.ConeGeometry(0.14, 0.55, 5);
+const tuftMatA = new THREE.MeshStandardMaterial({color:0x3a6e42, roughness:1, flatShading:true});
+const tuftMatB = new THREE.MeshStandardMaterial({color:0x2f5a36, roughness:1, flatShading:true});
+for (let i=0;i<160;i++){
+  const t = new THREE.Mesh(tuftGeo, Math.random()<.5?tuftMatA:tuftMatB);
+  const a = Math.random()*Math.PI*2, r = 3 + Math.random()*26;
+  t.position.set(Math.cos(a)*r, 0.24, Math.sin(a)*r);
+  t.rotation.y = Math.random()*Math.PI;
+  t.rotation.z = (Math.random()-.5)*0.2;
+  t.scale.setScalar(0.7+Math.random()*1.3);
+  scene.add(t);
+}
+/* little glowing flowers */
+const petalMats = [0xfff4e0, 0xf2b5d4, 0xffd166].map(c=>
+  new THREE.MeshStandardMaterial({color:c, roughness:.7, emissive:c, emissiveIntensity:0.18}));
+for (let i=0;i<26;i++){
+  const f = new THREE.Group();
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.025,0.3,5), tuftMatB);
+  stem.position.y = 0.15; f.add(stem);
+  const bloom = new THREE.Mesh(new THREE.SphereGeometry(0.07,8,6), petalMats[i%3]);
+  bloom.position.y = 0.33; f.add(bloom);
+  const a = Math.random()*Math.PI*2, r = 4 + Math.random()*11;
+  f.position.set(Math.cos(a)*r, 0, Math.sin(a)*r);
+  scene.add(f);
+}
+/* stepping stones */
+const stoneMat = new THREE.MeshStandardMaterial({color:0x5d6470, roughness:.95, flatShading:true});
+for (let i=0;i<7;i++){
+  const s = new THREE.Mesh(new THREE.CylinderGeometry(0.55+Math.random()*0.25, 0.6+Math.random()*0.25, 0.12, 7), stoneMat);
+  s.position.set(-6+i*2.1+Math.random()*0.6, 0.06, 6+Math.sin(i*1.2)*1.6);
+  s.rotation.y = Math.random()*Math.PI;
+  s.receiveShadow = true; s.castShadow = true;
+  scene.add(s);
+}
+/* fireflies */
+for (let i=0;i<16;i++){
+  const sp = makeGlow(0xc8ff8a, 0.5, 0.8);
+  scene.add(sp);
+  fireflies.push({sprite:sp, cx:(Math.random()-.5)*26, cz:(Math.random()-.5)*26,
+    r1:1.5+Math.random()*2, s1:0.2+Math.random()*0.4, s2:0.5+Math.random()*0.8,
+    p1:Math.random()*7, p2:Math.random()*7});
+}
+
+(function fence(){
+  const slat = new THREE.BoxGeometry(0.18, 1.5, 0.5);
+  const rail = new THREE.BoxGeometry(0.12, 0.14, 1);
+  const F = ARENA + 1.5;
+  for (const side of [[0,1],[0,-1],[1,1],[1,-1]]){
+    const axis = side[0], sign = side[1];
+    for (let p=-F; p<=F; p+=1.1){
+      const s = new THREE.Mesh(slat, M.fence);
+      if (axis===0) s.position.set(p, 0.75, sign*F);
+      else { s.position.set(sign*F, 0.75, p); s.rotation.y = Math.PI/2; }
+      s.castShadow = true; scene.add(s);
+    }
+    for (const h of [0.55, 1.1]){
+      const r = new THREE.Mesh(rail, M.fence);
+      r.scale.z = F*2+1;
+      if (axis===0) r.position.set(0, h, sign*F);
+      else { r.position.set(sign*F, h, 0); r.rotation.y = Math.PI/2; }
+      scene.add(r);
+    }
+  }
+})();
+
+for (const [x,z] of [[11,11],[-11,-11],[11,-11],[-11,11]]){
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.12,4.2,8), M.pole);
+  pole.position.set(x, 2.1, z); pole.castShadow = true; scene.add(pole);
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.42,12,12), M.lantern);
+  orb.position.set(x, 4.4, z); scene.add(orb);
+  const gl = makeGlow(0xff9a40, 5, 0.55);
+  gl.position.set(x, 4.4, z); scene.add(gl);
+}
+
+(function tree(){
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.8,5,8), M.trunk);
+  trunk.position.y = 2.5; trunk.castShadow = true; g.add(trunk);
+  for (const [dx,dy,dz,s] of [[0,5.8,0,2.6],[1.6,5,0.4,1.9],[-1.4,5.2,-0.6,1.7],[0.3,4.6,1.4,1.5]]){
+    const b = new THREE.Mesh(new THREE.SphereGeometry(s,10,10), M.leaf);
+    b.position.set(dx,dy,dz); b.castShadow = true; g.add(b);
+  }
+  g.position.set(-21, 0, 14); scene.add(g);
+})();
+
+const potGeo = new THREE.CylinderGeometry(0.5, 0.35, 0.7, 10);
+for (const [x,z] of [[13,-12],[-13,12],[12.5,3]]){
+  const pot = new THREE.Mesh(potGeo, M.dirt);
+  pot.position.set(x, 0.35, z); pot.castShadow = true; scene.add(pot);
+  const bush = new THREE.Mesh(new THREE.SphereGeometry(0.55,8,8), M.leaf);
+  bush.position.set(x, 0.95, z); scene.add(bush);
+}
+
+const moon = new THREE.Mesh(new THREE.SphereGeometry(5, 24, 24), M.moon);
+moon.position.set(-45, 38, -60); scene.add(moon);
+const moonHalo = makeGlow(0xfff0c8, 34, 0.5);
+moonHalo.position.copy(moon.position);
+scene.add(moonHalo);
+
+(function stars(){
+  const n = 350, pos = new Float32Array(n*3);
+  for (let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2, e = Math.random()*Math.PI*0.45, r = 150;
+    pos[i*3] = Math.cos(a)*Math.cos(e)*r;
+    pos[i*3+1] = Math.sin(e)*r + 8;
+    pos[i*3+2] = Math.sin(a)*Math.cos(e)*r;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({color:0xcdd6ff, size:0.7})));
+})();
+
+/* ============================================================
+   MR TIBBS — the real one. Tabby, white blaze, green eyes.
+============================================================ */
+function makeBodyTexture(){
+  return canvasTex(512,512,(g,w,h)=>{
+    g.fillStyle='#9a8a72'; g.fillRect(0,0,w,h);
+    const grad=g.createLinearGradient(0,0,0,130);
+    grad.addColorStop(0,'#6b5d4c'); grad.addColorStop(1,'rgba(107,93,76,0)');
+    g.fillStyle=grad; g.fillRect(0,0,w,130);
+    g.fillStyle='rgba(86,74,60,0.9)';
+    for(let i=0;i<14;i++){
+      const x=10+i*36+Math.random()*14, len=160+Math.random()*120, wd=9+Math.random()*8;
+      g.save(); g.translate(x,30); g.rotate((Math.random()-.5)*0.12);
+      g.fillRect(0,0,wd,len); g.restore();
+    }
+    g.fillStyle='#f4f1ea';
+    g.beginPath(); g.ellipse(128,330,80,130,0,0,7); g.fill();
+    g.beginPath(); g.moveTo(0,400);
+    for(let x=0;x<=w;x+=32) g.lineTo(x,392+Math.sin(x*0.07)*14);
+    g.lineTo(w,h); g.lineTo(0,h); g.closePath(); g.fill();
+  });
+}
+function makeHeadTexture(){
+  return canvasTex(512,512,(g,w,h)=>{
+    g.fillStyle='#9a8a72'; g.fillRect(0,0,w,h);
+    const grad=g.createLinearGradient(0,0,0,210);
+    grad.addColorStop(0,'#6b5d4c'); grad.addColorStop(1,'rgba(107,93,76,0)');
+    g.fillStyle=grad; g.fillRect(0,0,w,210);
+    // classic tabby 'M' above the face (face centre = x 128)
+    g.fillStyle='rgba(76,64,52,0.95)';
+    for(const dx of [-46,-23,0,23,46]){
+      g.save(); g.translate(128+dx,18); g.rotate(dx*0.004);
+      g.fillRect(-5,0,10,120+Math.abs(dx)*0.5); g.restore();
+    }
+    g.fillStyle='rgba(86,74,60,0.85)';
+    for(const cx of [16,240]) for(let i=0;i<3;i++) g.fillRect(cx-30, 230+i*30, 70, 11);
+    for(let i=0;i<4;i++) g.fillRect(340+i*36, 60, 11, 150);
+    // white blaze + muzzle
+    g.fillStyle='#f4f1ea';
+    g.beginPath();
+    g.moveTo(114,150); g.lineTo(142,150);
+    g.lineTo(172,330); g.lineTo(84,330); g.closePath(); g.fill();
+    g.beginPath(); g.ellipse(128,360,105,120,0,0,7); g.fill();
+  });
+}
+
+function buildTibbs(){
+  const root = new THREE.Group();
+  const rig = new THREE.Group();
+  root.add(rig);
+
+  const bodyMat = new THREE.MeshStandardMaterial({map:makeBodyTexture(), roughness:.85});
+  const headMat = new THREE.MeshStandardMaterial({map:makeHeadTexture(), roughness:.85});
+
+  // chibi body
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.55, 28, 22), bodyMat);
+  body.scale.set(1, 0.95, 1.28);
+  body.position.y = 0.66;
+  body.castShadow = true;
+  rig.add(body);
+
+  // haunches
+  for (const s of [-1,1]){
+    const hn = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 12), M.tabby);
+    hn.scale.set(0.9,1,1.05);
+    hn.position.set(s*0.34, 0.52, -0.42);
+    hn.castShadow = true;
+    rig.add(hn);
+  }
+
+  // fluffy white chest ruff
+  for (const [x,y,z,r] of [[-0.16,0.62,0.5,0.2],[0.16,0.62,0.5,0.2],[0,0.5,0.56,0.22],[0,0.74,0.52,0.18]]){
+    const f = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), M.white);
+    f.position.set(x,y,z);
+    rig.add(f);
+  }
+
+  // big chibi head
+  const head = new THREE.Group();
+  head.position.set(0, 1.42, 0.5);
+  rig.add(head);
+
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.52, 28, 22), headMat);
+  skull.scale.set(1.04, 0.95, 0.95);
+  skull.castShadow = true;
+  head.add(skull);
+
+  for (const s of [-1,1]){
+    const puff = new THREE.Mesh(new THREE.SphereGeometry(0.135, 12, 10), M.white);
+    puff.position.set(s*0.095, -0.14, 0.43);
+    head.add(puff);
+  }
+  const chin = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), M.white);
+  chin.position.set(0, -0.24, 0.4);
+  head.add(chin);
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), M.pink);
+  nose.scale.set(1.25, 0.8, 0.7);
+  nose.position.set(0, -0.05, 0.49);
+  head.add(nose);
+
+  // big green eyes
+  for (const s of [-1,1]){
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.115, 14, 12), M.green);
+    eye.scale.set(0.95, 1.25, 0.55);
+    eye.position.set(s*0.21, 0.09, 0.41);
+    eye.rotation.y = s*0.35;
+    head.add(eye);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), M.black);
+    pupil.scale.set(0.55, 1.5, 0.4);
+    pupil.position.set(s*0.215, 0.09, 0.465);
+    pupil.rotation.y = s*0.35;
+    head.add(pupil);
+    const shine = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 6),
+      new THREE.MeshBasicMaterial({color:0xffffff}));
+    shine.position.set(s*0.185, 0.135, 0.475);
+    head.add(shine);
+  }
+
+  // ears
+  for (const s of [-1,1]){
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.36, 8), M.tabbyD);
+    ear.position.set(s*0.28, 0.46, -0.05);
+    ear.rotation.z = -s*0.3;
+    ear.castShadow = true;
+    head.add(ear);
+    const inner = new THREE.Mesh(new THREE.ConeGeometry(0.095, 0.22, 8), M.pink);
+    inner.position.set(s*0.275, 0.45, -0.01);
+    inner.rotation.z = -s*0.3;
+    head.add(inner);
+  }
+
+  // gold shades pushed up on the forehead
+  const band = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.06, 0.06), M.goldM);
+  band.position.set(0, 0.36, 0.31);
+  band.rotation.x = -0.55;
+  head.add(band);
+  for (const s of [-1,1]){
+    const lens = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.13, 0.05), M.black);
+    lens.position.set(s*0.15, 0.385, 0.325);
+    lens.rotation.x = -0.55;
+    head.add(lens);
+  }
+
+  // whiskers
+  const whiskMat = new THREE.LineBasicMaterial({color:0xf4f1ea, transparent:true, opacity:0.85});
+  for (const s of [-1,1]) for (const dy of [-0.06, -0.13]){
+    const pts = [new THREE.Vector3(s*0.2, -0.1+dy*0.4, 0.46), new THREE.Vector3(s*0.64, dy, 0.3)];
+    head.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), whiskMat));
+  }
+
+  // legs — white with chunky paws
+  const legs = [];
+  const legGeo = new THREE.CylinderGeometry(0.085, 0.1, 0.45, 10);
+  const pawGeo = new THREE.SphereGeometry(0.13, 10, 8);
+  for (const [x,z] of [[-0.24,0.42],[0.24,0.42],[-0.3,-0.42],[0.3,-0.42]]){
+    const leg = new THREE.Group();
+    const upper = new THREE.Mesh(legGeo, M.white);
+    upper.position.y = -0.24;
+    upper.castShadow = true;
+    leg.add(upper);
+    const paw = new THREE.Mesh(pawGeo, M.white);
+    paw.scale.set(1, 0.75, 1.2);
+    paw.position.set(0, -0.46, 0.03);
+    leg.add(paw);
+    leg.position.set(x, 0.55, z);
+    rig.add(leg);
+    legs.push(leg);
+  }
+
+  // tail — one smooth curve, white tip
+  const tailGroup = new THREE.Group();
+  tailGroup.position.set(0, 0.68, -0.62);
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(-0.12, 0.3, -0.3),
+    new THREE.Vector3(0.05, 0.75, -0.38),
+    new THREE.Vector3(0.02, 1.05, -0.22),
+  ]);
+  const tail = new THREE.Mesh(new THREE.TubeGeometry(curve, 20, 0.085, 8, false), M.tabby);
+  tail.castShadow = true;
+  tailGroup.add(tail);
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), M.white);
+  tip.position.copy(curve.getPoint(1));
+  tailGroup.add(tip);
+  rig.add(tailGroup);
+
+  return {root, rig, head, legs, tailSegs:[tailGroup]};
+}
+
+const tibbs = buildTibbs();
+scene.add(tibbs.root);
+
+const ringGeo = new THREE.RingGeometry(0.6, 0.78, 40);
+const kickRing = new THREE.Mesh(ringGeo, M.ring.clone());
+kickRing.rotation.x = -Math.PI/2;
+kickRing.visible = false;
+scene.add(kickRing);
+
+/* ============================================================
+   ENEMIES
+============================================================ */
+function buildCucumber(){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 1.0, 10), M.cuc);
+  body.castShadow = true; g.add(body);
+  const top = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), M.cuc);
+  top.position.y = 0.5; g.add(top);
+  const bot = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), M.cuc);
+  bot.position.y = -0.5; g.add(bot);
+  for (let i=0;i<5;i++){
+    const wart = new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6), M.cucD);
+    wart.position.set(Math.sin(i*2.4)*0.27, -0.35+i*0.2, Math.cos(i*2.4)*0.27);
+    g.add(wart);
+  }
+  for (const s of [-1,1]){
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.07,8,8), M.white);
+    eye.position.set(s*0.12, 0.42, 0.23); g.add(eye);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.035,6,6), M.black);
+    pupil.position.set(s*0.12, 0.42, 0.29); g.add(pupil);
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.035,0.04), M.cucD);
+    brow.position.set(s*0.12, 0.53, 0.26); brow.rotation.z = s*0.5; g.add(brow);
+  }
+  g.position.y = 0.85;
+  return {mesh:g, kind:'cucumber', hp:1, speed:2.6, pts:10, bounce:true, r:0.55};
+}
+
+function buildVacuum(){
+  const g = new THREE.Group();
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.66, 0.26, 20), M.vac);
+  disc.castShadow = true; g.add(disc);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 8, 0, Math.PI*2, 0, Math.PI/2), M.vac);
+  dome.position.y = 0.13; g.add(dome);
+  const eye = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.07, 0.07), M.vacEye);
+  eye.position.set(0, 0.12, 0.55); g.add(eye);
+  const brush = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.5,8), M.black);
+  brush.rotation.z = Math.PI/2; brush.position.set(0,-0.1,0.55); g.add(brush);
+  g.position.y = 0.2;
+  return {mesh:g, kind:'vacuum', hp:1, speed:2.0, pts:15, spin:true, r:0.7};
+}
+
+function buildSpray(){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.27, 0.85, 10), M.spray);
+  body.castShadow = true; g.add(body);
+  const trigger = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.3, 0.36), M.sprayT);
+  trigger.position.set(0, 0.55, 0.07); g.add(trigger);
+  const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,0.2,8), M.sprayT);
+  nozzle.rotation.x = Math.PI/2; nozzle.position.set(0, 0.58, 0.32); g.add(nozzle);
+  for (const s of [-1,1]){
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.055,8,8), M.black);
+    eye.position.set(s*0.1, 0.25, 0.24); g.add(eye);
+  }
+  g.position.y = 0.6;
+  return {mesh:g, kind:'spray', hp:1, speed:3.6, pts:20, bounce:true, r:0.55};
+}
+
+function buildDog(){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.6, 1.3), M.dog);
+  body.position.y = 0.75; body.castShadow = true; g.add(body);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.5, 0.55), M.dog);
+  head.position.set(0, 1.2, 0.75); head.castShadow = true; g.add(head);
+  const snout = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.22, 0.3), M.dogD);
+  snout.position.set(0, 1.1, 1.1); g.add(snout);
+  const noseD = new THREE.Mesh(new THREE.SphereGeometry(0.07,8,8), M.black);
+  noseD.position.set(0, 1.13, 1.27); g.add(noseD);
+  for (const s of [-1,1]){
+    const ear = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.32, 0.1), M.dogD);
+    ear.position.set(s*0.22, 1.5, 0.62); ear.rotation.z = s*0.25; g.add(ear);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6), M.black);
+    eye.position.set(s*0.15, 1.28, 1.04); g.add(eye);
+  }
+  const legGeo = new THREE.CylinderGeometry(0.1,0.1,0.55,8);
+  for (const [x,z] of [[-0.26,0.45],[0.26,0.45],[-0.26,-0.45],[0.26,-0.45]]){
+    const leg = new THREE.Mesh(legGeo, M.dogD);
+    leg.position.set(x, 0.32, z); g.add(leg);
+  }
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.08,0.5,6), M.dog);
+  tail.position.set(0, 1.05, -0.75); tail.rotation.x = 0.7; g.add(tail);
+  return {mesh:g, kind:'dog', hp:2, speed:1.5, pts:30, bounce:false, r:0.9};
+}
+
+/* ---------- THE BATH (boss) ---------- */
+function buildBath(){
+  const g = new THREE.Group();
+  // tub
+  const outer = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.2, 1.7), M.tub);
+  outer.position.y = 0.9; outer.castShadow = true; g.add(outer);
+  const rim = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.18, 1.9), M.tub);
+  rim.position.y = 1.5; g.add(rim);
+  const inner = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.9, 1.4), M.tubIn);
+  inner.position.y = 1.05; g.add(inner);
+  const water = new THREE.Mesh(new THREE.BoxGeometry(2.25, 0.1, 1.35), M.water);
+  water.position.y = 1.42; g.add(water);
+  // claw feet
+  for (const [x,z] of [[-1.1,0.65],[1.1,0.65],[-1.1,-0.65],[1.1,-0.65]]){
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.2,8,8), M.goldM);
+    foot.position.set(x, 0.2, z); g.add(foot);
+  }
+  // angry eyes on the front
+  for (const s of [-1,1]){
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.14,10,10), M.white);
+    eye.position.set(s*0.5, 1.1, 0.88); g.add(eye);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.07,8,8), M.vacEye);
+    pupil.position.set(s*0.5, 1.1, 1.0); g.add(pupil);
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.06,0.06), M.tubIn);
+    brow.position.set(s*0.5, 1.28, 0.95); brow.rotation.z = s*0.55; g.add(brow);
+  }
+  // rubber duck henchman on the rim
+  const duck = new THREE.Group();
+  const db = new THREE.Mesh(new THREE.SphereGeometry(0.16,10,8), M.goldM);
+  duck.add(db);
+  const dh = new THREE.Mesh(new THREE.SphereGeometry(0.1,8,8), M.goldM);
+  dh.position.set(0.12,0.16,0); duck.add(dh);
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.1,6), M.lantern);
+  beak.rotation.z = -Math.PI/2; beak.position.set(0.24,0.15,0); duck.add(beak);
+  duck.position.set(0.9, 1.62, 0);
+  g.add(duck);
+  // bubbles container
+  const bubbles = [];
+  for (let i=0;i<6;i++){
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.08+Math.random()*0.08,8,8), M.bubble);
+    b.position.set((Math.random()-.5)*1.8, 1.5, (Math.random()-.5)*1.1);
+    g.add(b); bubbles.push(b);
+  }
+  return {mesh:g, kind:'bath', hp:7, maxHp:7, speed:1.15, pts:500, bounce:false, r:1.7, boss:true, bubbles, wobAmp:0};
+}
+
+const FACTORIES = [buildCucumber, buildVacuum, buildSpray];
+
+/* ============================================================
+   POWER-UPS
+============================================================ */
+function buildCatnip(){
+  const g = new THREE.Group();
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.05,0.5,6), M.catnip);
+  stem.position.y = 0.25; g.add(stem);
+  for (let i=0;i<4;i++){
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.42, 5), M.catnip);
+    leaf.position.set(Math.sin(i*1.6)*0.18, 0.55, Math.cos(i*1.6)*0.18);
+    leaf.rotation.x = 0.5*Math.cos(i*1.6);
+    leaf.rotation.z = -0.5*Math.sin(i*1.6);
+    g.add(leaf);
+  }
+  return {mesh:g, type:'catnip', glow:0x7aff8a};
+}
+function buildMilk(){
+  const g = new THREE.Group();
+  const carton = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.6, 0.42), M.milk);
+  carton.position.y = 0.3; carton.castShadow = true; g.add(carton);
+  const roofL = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.22, 0.44), M.milkB);
+  roofL.position.y = 0.68; roofL.rotation.z = 0; roofL.scale.y = 0.8; g.add(roofL);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.14, 0.44), M.milkB);
+  stripe.position.y = 0.3; g.add(stripe);
+  return {mesh:g, type:'milk', glow:0x9ecdf2};
+}
+function buildFish(){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), M.fishM);
+  body.scale.set(1.5, 0.85, 0.6); body.castShadow = true; g.add(body);
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.36, 4), M.fishM);
+  tail.rotation.z = Math.PI/2; tail.position.set(-0.52, 0, 0); g.add(tail);
+  const fin = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.25, 4), M.fishM);
+  fin.position.set(0, 0.3, 0); g.add(fin);
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8), M.black);
+  eye.position.set(0.28, 0.06, 0.16); g.add(eye);
+  g.position.y = 0.2;
+  return {mesh:g, type:'fish', glow:0xffd166};
+}
+const PUP_FACTORIES = {catnip:buildCatnip, milk:buildMilk, fish:buildFish};
+
+/* ============================================================
+   STATE
+============================================================ */
+const FACTS = [
+  "Mr Tibbs doesn't chase laser pointers. Laser pointers chase Mr Tibbs.",
+  "Mr Tibbs once stared at a cucumber. The cucumber flinched.",
+  "Mr Tibbs has nine lives. Danger has none left.",
+  "Mr Tibbs doesn't knock things off tables. Gravity asks his permission first.",
+  "Dogs don't chase Mr Tibbs. They request an audience.",
+  "Mr Tibbs landed on his feet once. The floor apologised.",
+  "The red dot caught Mr Tibbs one time. It is still in therapy.",
+  "Curiosity didn't kill the cat. Mr Tibbs killed curiosity.",
+  "Mr Tibbs doesn't have a vet. The vet has a Mr Tibbs.",
+  "Vacuum cleaners formed a support group. Topic: Mr Tibbs.",
+  "When Mr Tibbs sits in a box, the box considers it an honour.",
+  "Mr Tibbs doesn't purr. He generates seismic approval.",
+  "Mr Tibbs once meowed at 3am. The sun rose early out of respect.",
+  "Closed doors do not stop Mr Tibbs. They merely delay your apology.",
+  "Mr Tibbs shows his belly as a test. There is no correct answer.",
+];
+
+const S = {
+  mode:'menu', score:0, kills:0, combo:0, bestCombo:0, lives:9,
+  pos:new THREE.Vector3(), facing:0,
+  kickT:-1, kickCD:0, invuln:0,
+  dashT:-1, dashCD:0, dashDir:new THREE.Vector3(0,0,1),
+  rage:0, spawnT:0, pupT:8, time:0, slowmo:0, shake:0,
+  enemies:[], deads:[], particles:[], pups:[],
+  factIdx:0, nextBossAt:40, bossAlive:false, bathsDefeated:0,
+};
+
+function clearWorld(){
+  for (const e of S.enemies) scene.remove(e.mesh);
+  for (const d of S.deads) scene.remove(d.mesh);
+  for (const p of S.particles) scene.remove(p.mesh);
+  for (const u of S.pups) scene.remove(u.mesh);
+}
+function resetGame(){
+  clearWorld();
+  Object.assign(S, {
+    score:0, kills:0, combo:0, bestCombo:0, lives:9,
+    facing:0, kickT:-1, kickCD:0, invuln:0,
+    dashT:-1, dashCD:0, rage:0,
+    spawnT:1.2, pupT:8, time:0, slowmo:0, shake:0,
+    enemies:[], deads:[], particles:[], pups:[],
+    factIdx:0, nextBossAt:40, bossAlive:false, bathsDefeated:0,
+  });
+  S.pos.set(0,0,0);
+  tibbs.root.position.set(0,0,0);
+  tibbs.root.rotation.y = 0;
+  bossBar.style.display = 'none';
+  updateHUD();
+}
+
+/* ============================================================
+   HUD
+============================================================ */
+const elScore = document.getElementById('score');
+const elPaws = document.getElementById('paws');
+const elCombo = document.getElementById('combo');
+const elThreat = document.getElementById('threat');
+const hurtFlash = document.getElementById('hurtFlash');
+const rageGlow = document.getElementById('rageGlow');
+const rageBar = document.getElementById('rageBar');
+const rageFill = document.getElementById('rageFill');
+const bossBar = document.getElementById('bossBar');
+const bossHp = document.getElementById('bossHp');
+
+function updateHUD(){
+  elScore.textContent = S.score;
+  let s = '';
+  for (let i=0;i<9;i++) s += i < S.lives ? '🐾' : '✖️';
+  elPaws.innerHTML = s;
+  elThreat.textContent = 'THREAT LVL ' + (1 + Math.floor(S.kills/15));
+  if (S.combo >= 3){
+    elCombo.textContent = S.combo + ' COMBO';
+    elCombo.classList.add('on');
+    elCombo.style.fontSize = Math.min(46, 24 + S.combo) + 'px';
+  } else elCombo.classList.remove('on');
+}
+
+const hud = document.getElementById('hud');
+const projV = new THREE.Vector3();
+function floater(text, worldPos, color){
+  projV.copy(worldPos).project(camera);
+  if (projV.z > 1) return;
+  const d = document.createElement('div');
+  d.className = 'floater';
+  d.textContent = text;
+  if (color) d.style.color = color;
+  d.style.left = ((projV.x*0.5+0.5)*innerWidth) + 'px';
+  d.style.top  = ((-projV.y*0.5+0.5)*innerHeight) + 'px';
+  hud.appendChild(d);
+  setTimeout(()=>d.remove(), 1000);
+}
+
+const banner = document.getElementById('factBanner');
+const factText = document.getElementById('factText');
+const factTag = document.getElementById('factTag');
+let bannerTimer = null;
+function showBanner(text, tag, isBoss){
+  factText.textContent = text;
+  factTag.textContent = tag || 'VERIFIED TIBBS FACT';
+  banner.classList.toggle('boss', !!isBoss);
+  banner.classList.add('show');
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(()=>banner.classList.remove('show'), 4200);
+}
+function showFact(){
+  showBanner(FACTS[S.factIdx % FACTS.length]);
+  S.factIdx++;
+}
+
+/* ============================================================
+   AUDIO
+============================================================ */
+let AC = null, muted = false;
+function audio(){ if (!AC) AC = new (window.AudioContext||window.webkitAudioContext)(); return AC; }
+function tone(type, f0, f1, dur, vol){
+  if (muted) return;
+  try{
+    const ac = audio(), t = ac.currentTime;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t+dur*0.8);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t+dur);
+    o.connect(g).connect(ac.destination);
+    o.start(t); o.stop(t+dur+0.02);
+  }catch(e){}
+}
+function noiseCrack(){
+  if (muted) return;
+  try{
+    const ac = audio(), t = ac.currentTime;
+    const buf = ac.createBuffer(1, 2200, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i=0;i<d.length;i++) d[i] = (Math.random()*2-1)*(1-i/d.length);
+    const n = ac.createBufferSource(); n.buffer = buf;
+    const ng = ac.createGain(); ng.gain.setValueAtTime(0.1,t);
+    ng.gain.exponentialRampToValueAtTime(0.001,t+0.08);
+    n.connect(ng).connect(ac.destination); n.start(t);
+  }catch(e){}
+}
+const sfx = {
+  kick: ()=>tone('sawtooth', 700, 120, 0.13, 0.12),
+  hit:  ()=>{tone('square', 220, 60, 0.16, 0.18); noiseCrack();},
+  hurt: ()=>tone('triangle', 400, 90, 0.4, 0.16),
+  dash: ()=>tone('sine', 300, 900, 0.14, 0.1),
+  pup:  ()=>{tone('sine', 520, 1040, 0.18, 0.12); tone('sine', 660, 1320, 0.22, 0.08);},
+  boss: ()=>{tone('sawtooth', 90, 45, 0.7, 0.2); tone('square', 120, 55, 0.7, 0.12);},
+  fish: ()=>{tone('sine', 880, 1760, 0.5, 0.14); tone('sine', 1100, 2200, 0.5, 0.08);},
+};
+const muteBtn = document.getElementById('muteBtn');
+muteBtn.addEventListener('click', ()=>{
+  muted = !muted;
+  muteBtn.textContent = muted ? '🔇' : '🔊';
+});
+
+/* ============================================================
+   INPUT
+============================================================ */
+const keys = {};
+addEventListener('keydown', e=>{
+  keys[e.code] = true;
+  if (e.repeat) return;
+  if (e.code==='Space'||e.code==='KeyJ'){ doKick(); e.preventDefault(); }
+  if (e.code==='ShiftLeft'||e.code==='ShiftRight'||e.code==='KeyK') doDash();
+  if (e.code==='KeyP'||e.code==='Escape') togglePause();
+  if (e.code==='KeyM'){ muted=!muted; muteBtn.textContent = muted?'🔇':'🔊'; }
+});
+addEventListener('keyup', e=>{ keys[e.code] = false; });
+
+let isTouch = false;
+addEventListener('touchstart', ()=>{
+  if (!isTouch){ isTouch = true; document.body.classList.add('touch'); }
+}, {passive:true});
+
+renderer.domElement.addEventListener('pointerdown', e=>{
+  if (S.mode!=='play') return;
+  if (joyId !== null && e.pointerId === joyId) return;
+  if (isTouch && e.clientX < innerWidth*0.5){ joyStart(e); return; }
+  doKick();
+});
+
+const joyEl = document.getElementById('joy');
+const knob = document.getElementById('joyKnob');
+let joyId = null, joyOrigin = {x:0,y:0}, joyVec = {x:0,y:0};
+function joyStart(e){
+  joyId = e.pointerId;
+  joyOrigin = {x:e.clientX, y:e.clientY};
+  joyEl.style.display = 'block';
+  joyEl.style.left = (e.clientX-60)+'px';
+  joyEl.style.top = (e.clientY-60)+'px';
+}
+addEventListener('pointermove', e=>{
+  if (e.pointerId !== joyId) return;
+  const dx = e.clientX - joyOrigin.x, dy = e.clientY - joyOrigin.y;
+  const len = Math.hypot(dx,dy), max = 50;
+  const cl = Math.min(len, max);
+  const nx = len ? dx/len : 0, ny = len ? dy/len : 0;
+  joyVec = {x: nx*(cl/max), y: ny*(cl/max)};
+  knob.style.transform = `translate(calc(-50% + ${nx*cl}px), calc(-50% + ${ny*cl}px))`;
+});
+function joyEnd(e){
+  if (e.pointerId !== joyId) return;
+  joyId = null; joyVec = {x:0,y:0};
+  joyEl.style.display = 'none';
+  knob.style.transform = 'translate(-50%,-50%)';
+}
+addEventListener('pointerup', joyEnd);
+addEventListener('pointercancel', joyEnd);
+
+document.getElementById('kickBtn').addEventListener('pointerdown', e=>{e.stopPropagation(); doKick();});
+document.getElementById('dashBtn').addEventListener('pointerdown', e=>{e.stopPropagation(); doDash();});
+
+/* ============================================================
+   COMBAT
+============================================================ */
+const KICK_RADIUS = 3.4;
+const KICK_DUR = 0.38;
+
+function kickRadius(){ return S.rage > 0 ? KICK_RADIUS*1.6 : KICK_RADIUS; }
+function kickCooldown(){ return S.rage > 0 ? 0.24 : 0.46; }
+function scoreMult(){ return (1 + Math.floor(S.combo/5)) * (S.rage > 0 ? 2 : 1); }
+
+function doKick(){
+  if (S.mode!=='play' || S.kickCD > 0) return;
+  S.kickT = 0;
+  S.kickCD = kickCooldown();
+  sfx.kick();
+
+  kickRing.visible = true;
+  kickRing.position.copy(S.pos); kickRing.position.y = 0.12;
+  kickRing.scale.setScalar(0.4);
+  kickRing.material.opacity = 0.9;
+  kickRing.material.color.setHex(S.rage>0 ? 0x7aff8a : 0xffd166);
+
+  let killsNow = 0;
+  const R = kickRadius();
+  for (let i = S.enemies.length-1; i>=0; i--){
+    const e = S.enemies[i];
+    const d = e.mesh.position.distanceTo(S.pos);
+    if (d <= R + e.r*0.5){
+      damageEnemy(e, 1, i);
+      if (e.hp <= 0) killsNow++;
+    }
+  }
+  if (killsNow > 0){
+    S.shake = Math.min(0.5, 0.18 + killsNow*0.08);
+    if (killsNow >= 3){
+      S.slowmo = 0.55;
+      floater('TRIPLE TAKEDOWN', S.pos.clone().add(new THREE.Vector3(0,3,0)), '#ff8c3b');
+    }
+  } else if (S.rage <= 0) {
+    S.combo = 0;
+    updateHUD();
+  }
+}
+
+function damageEnemy(e, amount, idx){
+  e.hp -= amount;
+  if (e.hp <= 0){
+    const i = idx !== undefined ? idx : S.enemies.indexOf(e);
+    if (i >= 0) S.enemies.splice(i, 1);
+    killEnemy(e);
+  } else {
+    const away = e.mesh.position.clone().sub(S.pos).setY(0).normalize();
+    e.knock = away.multiplyScalar(e.boss ? 5 : 9);
+    e.flash = 0.18;
+    if (e.boss){
+      bossHp.style.width = (e.hp / e.maxHp * 100) + '%';
+      floater('SPLOOSH', e.mesh.position.clone().add(new THREE.Vector3(0,2.4,0)), '#7fd4ff');
+    } else {
+      floater('CLANG', e.mesh.position.clone().add(new THREE.Vector3(0,1.6,0)), '#fff4e0');
+    }
+    sfx.hit();
+  }
+}
+
+function killEnemy(e){
+  S.kills++; S.combo++;
+  S.bestCombo = Math.max(S.bestCombo, S.combo);
+  const pts = e.pts * scoreMult();
+  S.score += pts;
+  sfx.hit();
+  floater('+'+pts, e.mesh.position.clone().add(new THREE.Vector3(0,1.8,0)));
+
+  const away = e.mesh.position.clone().sub(S.pos).setY(0).normalize();
+  e.deadVel = away.multiplyScalar(10 + Math.random()*5);
+  e.deadVel.y = 7 + Math.random()*4;
+  e.deadSpin = new THREE.Vector3((Math.random()-.5)*14,(Math.random()-.5)*14,(Math.random()-.5)*14);
+  e.deadT = 0;
+  S.deads.push(e);
+  spawnBurst(e.mesh.position, e.boss ? 30 : 12);
+
+  if (e.boss){
+    S.bossAlive = false;
+    S.bathsDefeated++;
+    bossBar.style.display = 'none';
+    S.slowmo = 0.9;
+    S.shake = 0.6;
+    showBanner('THE BATH HAS BEEN DRAINED. Mr Tibbs remains gloriously dry.', 'BOSS DEFEATED', true);
+  } else if (S.kills % 10 === 0) showFact();
+  updateHUD();
+}
+
+function spawnSpark(pos, color, scale, vel, life){
+  const s = makeGlow(color, scale, 1);
+  s.position.copy(pos);
+  scene.add(s);
+  S.particles.push({mesh:s, vel, life});
+}
+function spawnBurst(pos, n){
+  n = n || 12;
+  for (let i=0;i<n;i++){
+    const col = S.rage>0 && Math.random()<.4 ? 0x7aff8a : (Math.random()<.5?0xffd166:0xff8c3b);
+    const a = Math.random()*Math.PI*2;
+    spawnSpark(
+      new THREE.Vector3(pos.x, pos.y+0.6, pos.z),
+      col, 0.5+Math.random()*0.5,
+      new THREE.Vector3(Math.cos(a)*(2+Math.random()*5), 3+Math.random()*5, Math.sin(a)*(2+Math.random()*5)),
+      0.7+Math.random()*0.4);
+  }
+}
+
+function hurtTibbs(e){
+  if (S.invuln > 0 || S.dashT >= 0) return;
+  S.lives--; S.combo = 0; S.invuln = 1.4;
+  S.shake = 0.5;
+  sfx.hurt();
+  hurtFlash.style.opacity = 1;
+  setTimeout(()=>hurtFlash.style.opacity = 0, 160);
+  floater('-1 LIFE', S.pos.clone().add(new THREE.Vector3(0,3,0)), '#ff4d6d');
+  const away = e.mesh.position.clone().sub(S.pos).setY(0).normalize();
+  e.knock = away.multiplyScalar(e.boss ? 8 : 14);
+  updateHUD();
+  if (S.lives <= 0) gameOver();
+}
+
+/* ---------- dash ---------- */
+const DASH_DUR = 0.18, DASH_SPEED = 26;
+function doDash(){
+  if (S.mode!=='play' || S.dashCD > 0 || S.dashT >= 0) return;
+  S.dashT = 0;
+  S.dashCD = 1.1;
+  S.dashDir.set(Math.sin(S.facing), 0, Math.cos(S.facing));
+  sfx.dash();
+}
+
+/* ============================================================
+   POWER-UPS
+============================================================ */
+function spawnPup(){
+  const roll = Math.random();
+  const type = roll < 0.45 ? 'catnip' : roll < 0.78 ? 'milk' : 'fish';
+  const p = PUP_FACTORIES[type]();
+  const a = Math.random()*Math.PI*2, r = 3 + Math.random()*10;
+  p.mesh.position.set(Math.cos(a)*r, 0, Math.sin(a)*r);
+  p.baseY = p.mesh.position.y;
+  p.life = 11;
+  // glow ring under it
+  const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+    color:p.glow, transparent:true, opacity:0.55, side:THREE.DoubleSide}));
+  ring.rotation.x = -Math.PI/2;
+  ring.position.copy(p.mesh.position); ring.position.y = 0.06;
+  scene.add(ring);
+  p.ring = ring;
+  scene.add(p.mesh);
+  S.pups.push(p);
+}
+
+function collectPup(p){
+  sfx.pup();
+  spawnBurst(p.mesh.position, 10);
+  if (p.type === 'catnip'){
+    S.rage = 8;
+    showBanner('CATNIP RAGE — double points, monster kicks, no mercy.', 'POWER-UP');
+    floater('RAGE!', S.pos.clone().add(new THREE.Vector3(0,3,0)), '#7aff8a');
+  } else if (p.type === 'milk'){
+    if (S.lives < 9){ S.lives++; floater('+1 LIFE', S.pos.clone().add(new THREE.Vector3(0,3,0)), '#9ecdf2'); }
+    else { S.score += 100; floater('+100', S.pos.clone().add(new THREE.Vector3(0,3,0))); }
+  } else if (p.type === 'fish'){
+    sfx.fish();
+    S.slowmo = 0.8;
+    S.shake = 0.5;
+    floater('THE FISH JUDGES ALL', S.pos.clone().add(new THREE.Vector3(0,3.4,0)), '#ffd166');
+    // smite every non-boss enemy; boss takes 3
+    for (let i = S.enemies.length-1; i>=0; i--){
+      const e = S.enemies[i];
+      if (e.boss) damageEnemy(e, 3, i);
+      else { S.enemies.splice(i,1); killEnemy(e); }
+    }
+  }
+  updateHUD();
+}
+
+/* ============================================================
+   SPAWNING
+============================================================ */
+function difficulty(){
+  const k = S.kills;
+  return {
+    interval: Math.max(0.42, 1.7 - k*0.02),
+    speedMult: 1 + Math.min(1.3, k*0.013),
+    dogChance: Math.min(0.3, 0.05 + k*0.004),
+  };
+}
+
+function placeAtFence(mesh){
+  const edge = Math.floor(Math.random()*4);
+  const t = (Math.random()*2-1) * (ARENA+3);
+  const F = ARENA + 4;
+  if (edge===0) mesh.position.set(t, mesh.position.y, -F);
+  if (edge===1) mesh.position.set(t, mesh.position.y, F);
+  if (edge===2) mesh.position.set(-F, mesh.position.y, t);
+  if (edge===3) mesh.position.set(F, mesh.position.y, t);
+}
+
+function spawnEnemy(){
+  const d = difficulty();
+  let factory;
+  const roll = Math.random();
+  if (roll < d.dogChance) factory = buildDog;
+  else factory = FACTORIES[Math.floor(Math.random()*3)];
+  const e = factory();
+  placeAtFence(e.mesh);
+  e.baseY = e.mesh.position.y;
+  e.speed *= d.speedMult * (0.9 + Math.random()*0.25);
+  e.wob = Math.random()*Math.PI*2;
+  e.knock = null; e.flash = 0;
+  scene.add(e.mesh);
+  S.enemies.push(e);
+}
+
+function spawnBoss(){
+  const b = buildBath();
+  b.hp = b.maxHp = 7 + S.bathsDefeated * 3;
+  b.speed += S.bathsDefeated * 0.18;
+  placeAtFence(b.mesh);
+  b.baseY = 0; b.wob = 0; b.knock = null; b.flash = 0;
+  scene.add(b.mesh);
+  S.enemies.push(b);
+  S.bossAlive = true;
+  bossBar.style.display = 'block';
+  bossHp.style.width = '100%';
+  sfx.boss();
+  S.shake = 0.5;
+  showBanner('THE BATH has entered the garden. It wants Mr Tibbs CLEAN.', '⚠ BOSS INBOUND', true);
+}
+
+/* ============================================================
+   MAIN LOOP
+============================================================ */
+const clock = new THREE.Clock();
+const camTarget = new THREE.Vector3();
+const tmpV = new THREE.Vector3();
+
+function animate(){
+  requestAnimationFrame(animate);
+  let dt = Math.min(clock.getDelta(), 0.05);
+  const realDt = dt;
+  if (S.slowmo > 0){ S.slowmo -= realDt; dt *= 0.25; }
+  if (S.mode === 'play') update(dt, realDt);
+  idleAnimate();
+  updateCamera(realDt);
+  renderer.render(scene, camera);
+}
+
+function update(dt, realDt){
+  S.time += dt;
+  if (S.kickCD > 0) S.kickCD -= dt;
+  if (S.dashCD > 0) S.dashCD -= dt;
+  if (S.invuln > 0) S.invuln -= dt;
+
+  /* rage timer */
+  if (S.rage > 0){
+    S.rage -= dt;
+    rageBar.style.display = 'block';
+    rageFill.style.width = Math.max(0, S.rage/8*100) + '%';
+    rageGlow.style.opacity = 1;
+    rageLight.intensity = 1.6 + Math.sin(S.time*12)*0.4;
+    rageLight.position.copy(S.pos); rageLight.position.y = 1.4;
+    if (Math.random() < 0.5){
+      spawnSpark(new THREE.Vector3(S.pos.x+(Math.random()-.5)*0.9, 0.2, S.pos.z+(Math.random()-.5)*0.9),
+        0x7aff8a, 0.45, new THREE.Vector3(0, 2.5+Math.random()*2, 0), 0.6);
+    }
+    if (S.rage <= 0){ rageBar.style.display='none'; rageGlow.style.opacity=0; rageLight.intensity=0; }
+  }
+
+  /* ---- movement ---- */
+  let mx = 0, mz = 0;
+  if (keys.KeyW||keys.ArrowUp) mz -= 1;
+  if (keys.KeyS||keys.ArrowDown) mz += 1;
+  if (keys.KeyA||keys.ArrowLeft) mx -= 1;
+  if (keys.KeyD||keys.ArrowRight) mx += 1;
+  mx += joyVec.x; mz += joyVec.y;
+  const ml = Math.hypot(mx,mz);
+  if (ml > 1){ mx/=ml; mz/=ml; }
+
+  const SPEED = (S.rage>0 ? 9.5 : 7.5);
+
+  if (S.dashT >= 0){
+    S.dashT += dt;
+    S.pos.add(tmpV.copy(S.dashDir).multiplyScalar(DASH_SPEED*dt));
+    if (Math.random()<0.85){
+      spawnSpark(new THREE.Vector3(S.pos.x, 0.3, S.pos.z), 0xffd166, 0.5,
+        new THREE.Vector3(0,1.5,0), 0.35);
+    }
+    if (S.dashT >= DASH_DUR) S.dashT = -1;
+  } else {
+    S.pos.x += mx*SPEED*dt;
+    S.pos.z += mz*SPEED*dt;
+  }
+  S.pos.x = THREE.MathUtils.clamp(S.pos.x, -ARENA, ARENA);
+  S.pos.z = THREE.MathUtils.clamp(S.pos.z, -ARENA, ARENA);
+  tibbs.root.position.copy(S.pos);
+
+  const moving = ml > 0.08;
+  if (moving){
+    const target = Math.atan2(mx, mz);
+    let diff = target - S.facing;
+    while (diff > Math.PI) diff -= Math.PI*2;
+    while (diff < -Math.PI) diff += Math.PI*2;
+    S.facing += diff * Math.min(1, dt*14);
+  }
+
+  /* ---- kick animation ---- */
+  if (S.kickT >= 0){
+    S.kickT += dt;
+    const t = S.kickT / KICK_DUR;
+    if (t >= 1){ S.kickT = -1; tibbs.rig.rotation.y = 0; tibbs.rig.position.y = 0; }
+    else {
+      tibbs.rig.rotation.y = t * Math.PI * 2;
+      tibbs.rig.position.y = Math.sin(t*Math.PI) * 0.45;
+      tibbs.legs[2].rotation.x = Math.sin(t*Math.PI) * 1.6;
+      tibbs.legs[3].rotation.x = Math.sin(t*Math.PI) * 1.6;
+    }
+  } else {
+    tibbs.legs[2].rotation.x *= 0.8;
+    tibbs.legs[3].rotation.x *= 0.8;
+  }
+  tibbs.root.rotation.y = S.facing;
+
+  if (moving && S.kickT < 0){
+    const w = S.time*13;
+    tibbs.rig.position.y = Math.abs(Math.sin(w))*0.1;
+    tibbs.legs[0].rotation.x =  Math.sin(w)*0.7;
+    tibbs.legs[1].rotation.x = -Math.sin(w)*0.7;
+    tibbs.legs[2].rotation.x = -Math.sin(w)*0.7;
+    tibbs.legs[3].rotation.x =  Math.sin(w)*0.7;
+  } else if (S.kickT < 0){
+    tibbs.rig.position.y *= 0.85;
+    tibbs.legs[0].rotation.x *= 0.8;
+    tibbs.legs[1].rotation.x *= 0.8;
+  }
+
+  tibbs.root.visible = !(S.invuln > 0 && Math.floor(S.invuln*14)%2===0);
+
+  /* ---- ring fx ---- */
+  if (kickRing.visible){
+    kickRing.scale.multiplyScalar(1 + dt*9);
+    kickRing.material.opacity -= dt*2.6;
+    if (kickRing.material.opacity <= 0) kickRing.visible = false;
+  }
+
+  /* ---- spawning ---- */
+  S.spawnT -= dt;
+  if (S.spawnT <= 0){
+    spawnEnemy();
+    const d = difficulty();
+    S.spawnT = d.interval * (S.bossAlive ? 1.6 : 1);
+    if (!S.bossAlive && Math.random() < Math.min(0.4, S.kills*0.006)) spawnEnemy();
+  }
+  if (!S.bossAlive && S.kills >= S.nextBossAt){
+    S.nextBossAt += 50;
+    spawnBoss();
+  }
+
+  /* ---- power-ups ---- */
+  S.pupT -= dt;
+  if (S.pupT <= 0){
+    S.pupT = 12 + Math.random()*5;
+    if (S.pups.length < 2) spawnPup();
+  }
+  for (let i=S.pups.length-1;i>=0;i--){
+    const p = S.pups[i];
+    p.life -= dt;
+    p.mesh.rotation.y += dt*2.4;
+    p.mesh.position.y = p.baseY + 0.25 + Math.sin(S.time*3 + i)*0.15;
+    p.ring.scale.setScalar(1.1 + Math.sin(S.time*4)*0.15);
+    const gone = p.life <= 0;
+    const grabbed = p.mesh.position.distanceTo(S.pos) < 1.3;
+    if (grabbed) collectPup(p);
+    if (gone || grabbed){
+      scene.remove(p.mesh); scene.remove(p.ring);
+      S.pups.splice(i,1);
+    }
+  }
+
+  /* ---- enemies ---- */
+  for (const e of S.enemies){
+    e.wob += dt*6;
+    if (e.knock){
+      e.mesh.position.add(tmpV.copy(e.knock).multiplyScalar(dt));
+      e.knock.multiplyScalar(Math.pow(0.001, dt));
+      if (e.knock.lengthSq() < 0.4) e.knock = null;
+    } else {
+      tmpV.copy(S.pos).sub(e.mesh.position).setY(0);
+      const dist = tmpV.length();
+      tmpV.normalize();
+      e.mesh.position.add(tmpV.multiplyScalar(e.speed*dt));
+      e.mesh.rotation.y = Math.atan2(tmpV.x, tmpV.z);
+      if (dist < (e.boss ? 1.9 : 1.0 + e.r*0.4)) hurtTibbs(e);
+    }
+    if (e.bounce) e.mesh.position.y = e.baseY + Math.abs(Math.sin(e.wob))*0.3;
+    if (e.spin) e.mesh.rotation.y += dt*5;
+    if (e.boss){
+      // tub waddles and bubbles rise
+      e.mesh.rotation.z = Math.sin(e.wob*0.7)*0.06;
+      for (const b of e.bubbles){
+        b.position.y += dt*0.8;
+        if (b.position.y > 2.6){
+          b.position.y = 1.5;
+          b.position.x = (Math.random()-.5)*1.8;
+          b.position.z = (Math.random()-.5)*1.1;
+        }
+      }
+    }
+    if (e.flash > 0) e.flash -= dt;
+  }
+
+  /* ---- dead ragdolls ---- */
+  for (let i=S.deads.length-1;i>=0;i--){
+    const d = S.deads[i];
+    d.deadT += dt;
+    d.deadVel.y -= 22*dt;
+    d.mesh.position.add(tmpV.copy(d.deadVel).multiplyScalar(dt));
+    d.mesh.rotation.x += d.deadSpin.x*dt;
+    d.mesh.rotation.y += d.deadSpin.y*dt;
+    d.mesh.rotation.z += d.deadSpin.z*dt;
+    if (d.deadT > 0.55) d.mesh.scale.multiplyScalar(Math.pow(0.02, dt));
+    if (d.deadT > 1.1){ scene.remove(d.mesh); S.deads.splice(i,1); }
+  }
+
+  /* ---- particles ---- */
+  for (let i=S.particles.length-1;i>=0;i--){
+    const p = S.particles[i];
+    p.life -= dt;
+    p.vel.y -= 16*dt;
+    p.mesh.position.add(tmpV.copy(p.vel).multiplyScalar(dt));
+    p.mesh.scale.setScalar(Math.max(0.01, p.life)*0.9);
+    if (p.mesh.material && p.mesh.material.opacity !== undefined)
+      p.mesh.material.opacity = Math.min(1, p.life*1.6);
+    if (p.life <= 0){ scene.remove(p.mesh); S.particles.splice(i,1); }
+  }
+
+  if (S.shake > 0) S.shake = Math.max(0, S.shake - realDt*1.6);
+}
+
+function idleAnimate(){
+  const t = performance.now()*0.001;
+  const tail = tibbs.tailSegs[0];
+  tail.rotation.x = Math.sin(t*1.8)*0.18;
+  tail.rotation.z = Math.sin(t*2.3)*0.25;
+  tibbs.head.rotation.y = Math.sin(t*0.7)*0.12;
+  tibbs.head.rotation.x = Math.sin(t*0.9)*0.05;
+  for (const f of fireflies){
+    f.sprite.position.set(
+      f.cx + Math.sin(t*f.s1 + f.p1)*f.r1,
+      1.6 + Math.sin(t*f.s2 + f.p2)*0.8,
+      f.cz + Math.cos(t*f.s1*0.8 + f.p2)*f.r1
+    );
+    f.sprite.material.opacity = 0.5 + Math.sin(t*f.s2*2 + f.p1)*0.4;
+  }
+}
+
+function updateCamera(dt){
+  camTarget.copy(S.pos);
+  const wantPos = tmpV.set(S.pos.x*0.85, 13.5, S.pos.z*0.85 + 13);
+  camera.position.lerp(wantPos, Math.min(1, dt*4));
+  if (S.shake > 0){
+    camera.position.x += (Math.random()-.5)*S.shake;
+    camera.position.y += (Math.random()-.5)*S.shake;
+    camera.position.z += (Math.random()-.5)*S.shake;
+  }
+  camera.lookAt(camTarget.x, 1.2, camTarget.z);
+}
+
+/* ============================================================
+   FLOW + LEADERBOARD UI
+============================================================ */
+const menu = document.getElementById('menu');
+const over = document.getElementById('gameover');
+const pauseEl = document.getElementById('pause');
+const saveStatus = document.getElementById('saveStatus');
+
+function start(){
+  audio();
+  resetGame();
+  S.mode = 'play';
+  menu.classList.add('hidden');
+  over.classList.add('hidden');
+  pauseEl.classList.add('hidden');
+}
+
+function togglePause(){
+  if (S.mode === 'play'){
+    S.mode = 'paused';
+    pauseEl.classList.remove('hidden');
+  } else if (S.mode === 'paused'){
+    S.mode = 'play';
+    pauseEl.classList.add('hidden');
+    clock.getDelta(); // swallow paused time
+  }
+}
+
+async function gameOver(){
+  S.mode = 'over';
+  rageBar.style.display='none'; rageGlow.style.opacity=0; rageLight.intensity=0;
+  bossBar.style.display='none';
+  document.getElementById('finalScore').textContent = S.score;
+  document.getElementById('finalStats').textContent =
+    S.kills + ' threats neutralised · best combo ×' + S.bestCombo +
+    (S.bathsDefeated ? ' · ' + S.bathsDefeated + ' bath(s) drained' : '');
+  document.getElementById('finalFact').textContent =
+    FACTS[Math.floor(Math.random()*FACTS.length)];
+  over.classList.remove('hidden');
+
+  const FB = window.FIREBASE;
+  if (FB && FB.enabled && FB.user){
+    saveStatus.textContent = 'Posting to the Hall of Legends…';
+    try{
+      const res = await FB.submitScore({score:S.score, kills:S.kills, bestCombo:S.bestCombo});
+      saveStatus.textContent = res.improved
+        ? '✓ New personal best — posted to the Hall of Legends!'
+        : 'Your record stands at ' + res.best + '. The Hall remembers.';
+      refreshBoards();
+    }catch(err){
+      saveStatus.textContent = 'Could not reach the Hall of Legends.';
+    }
+  } else if (FB && FB.enabled){
+    saveStatus.textContent = 'Sign in on the menu to post your score.';
+  } else {
+    saveStatus.textContent = 'Offline mode — connect Firebase to save scores.';
+  }
+}
+
+document.getElementById('startBtn').addEventListener('click', start);
+document.getElementById('retryBtn').addEventListener('click', start);
+document.getElementById('resumeBtn').addEventListener('click', togglePause);
+document.getElementById('quitBtn').addEventListener('click', ()=>{
+  S.mode = 'menu';
+  pauseEl.classList.add('hidden');
+  menu.classList.remove('hidden');
+});
+document.getElementById('menuBtn').addEventListener('click', ()=>{
+  S.mode = 'menu';
+  over.classList.add('hidden');
+  menu.classList.remove('hidden');
+  refreshBoards();
+});
+
+/* ---------- leaderboard rendering ---------- */
+function renderBoard(el, rows, myUid){
+  el.innerHTML = '';
+  if (!rows || rows.length === 0){
+    el.innerHTML = '<li class="empty">No legends yet. Be the first.</li>';
+    return;
+  }
+  rows.forEach((r, i) => {
+    const li = document.createElement('li');
+    if (myUid && r.uid === myUid) li.classList.add('me');
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
+    li.innerHTML = '<span class="rank">'+medal+'</span>' +
+      '<span class="nm"></span><span class="sc">'+(r.score|0)+'</span>';
+    li.querySelector('.nm').textContent = r.name || 'UNKNOWN CAT';
+    el.appendChild(li);
+  });
+}
+
+async function refreshBoards(){
+  const FB = window.FIREBASE;
+  const boardEls = [document.getElementById('board'), document.getElementById('boardOver')];
+  if (!FB || !FB.enabled){
+    for (const el of boardEls)
+      el.innerHTML = '<li class="empty">Offline mode — add your Firebase config to enable the global leaderboard.</li>';
+    return;
+  }
+  try{
+    const rows = await FB.fetchTop();
+    const uid = FB.user ? FB.user.uid : null;
+    for (const el of boardEls) renderBoard(el, rows, uid);
+  }catch(err){
+    for (const el of boardEls)
+      el.innerHTML = '<li class="empty">Could not load the Hall of Legends.</li>';
+  }
+}
+
+/* ---------- auth UI ---------- */
+const authSignedOut = document.getElementById('authSignedOut');
+const authSignedIn = document.getElementById('authSignedIn');
+const playerName = document.getElementById('playerName');
+const authNote = document.getElementById('authNote');
+const guestNameInput = document.getElementById('guestName');
+
+window.TIBBS_UI = {
+  setUser(user){
+    if (user){
+      authSignedOut.classList.add('hidden');
+      authSignedIn.classList.remove('hidden');
+      playerName.textContent = user.displayName || 'NAMELESS LEGEND';
+    } else {
+      authSignedOut.classList.remove('hidden');
+      authSignedIn.classList.add('hidden');
+    }
+    refreshBoards();
+  },
+  setOffline(reason){
+    authNote.textContent = reason;
+    document.getElementById('guestBtn').disabled = true;
+    document.getElementById('googleBtn').disabled = true;
+    document.getElementById('guestBtn').style.opacity = 0.4;
+    document.getElementById('googleBtn').style.opacity = 0.4;
+    refreshBoards();
+  },
+};
+
+document.getElementById('guestBtn').addEventListener('click', async ()=>{
+  const FB = window.FIREBASE;
+  if (!FB || !FB.enabled) return;
+  const name = (guestNameInput.value || '').trim().toUpperCase() ||
+    'TIBBS FAN ' + Math.floor(Math.random()*900+100);
+  try{ await FB.signInGuest(name.slice(0,14)); }
+  catch(e){ authNote.textContent = 'Guest sign-in failed: ' + (e.message||e); }
+});
+document.getElementById('googleBtn').addEventListener('click', async ()=>{
+  const FB = window.FIREBASE;
+  if (!FB || !FB.enabled) return;
+  try{ await FB.signInGoogle(); }
+  catch(e){ authNote.textContent = 'Google sign-in failed: ' + (e.message||e); }
+});
+document.getElementById('signOutBtn').addEventListener('click', ()=>{
+  const FB = window.FIREBASE;
+  if (FB && FB.enabled) FB.signOutUser();
+});
+
+/* keep boards fresh on load */
+setTimeout(refreshBoards, 1500);
+
+camera.position.set(10, 12, 16);
+camera.lookAt(0, 1, 0);
+animate();
+})();
+</script>
+
+<!-- ============================================================
+     FIREBASE — Auth + Firestore leaderboard
+     1. Create a Firebase project (console.firebase.google.com)
+     2. Enable Authentication: Google + Anonymous
+     3. Create a Firestore database
+     4. Paste your web app config below
+     Full steps in README.md
+============================================================ -->
+<script type="module">
+const firebaseConfig = {
+  apiKey: "AIzaSyAGEbFwnQMsxN0tJEOx9xwMSMK7aw1xRh4",
+  authDomain: "tibs-be3b5.firebaseapp.com",
+  databaseURL: "https://tibs-be3b5-default-rtdb.firebaseio.com",
+  projectId: "tibs-be3b5",
+  storageBucket: "tibs-be3b5.firebasestorage.app",
+  messagingSenderId: "293679373652",
+  appId: "1:293679373652:web:b3e83a9f46476ec7a2bcc1"
+};
+
+const FB = { enabled:false, user:null };
+window.FIREBASE = FB;
+
+try{
+  const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+  const { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously,
+          onAuthStateChanged, updateProfile, signOut } =
+    await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
+  const { getDatabase, ref, get, set, query, orderByChild, limitToLast, serverTimestamp } =
+    await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getDatabase(app);
+  FB.enabled = true;
+
+  onAuthStateChanged(auth, (user) => {
+    FB.user = user;
+    window.TIBBS_UI.setUser(user);
+  });
+
+  FB.signInGoogle = async () =>
+    (await signInWithPopup(auth, new GoogleAuthProvider())).user;
+
+  FB.signInGuest = async (name) => {
+    const cred = await signInAnonymously(auth);
+    await updateProfile(cred.user, { displayName: name });
+    FB.user = cred.user;
+    window.TIBBS_UI.setUser(cred.user);
+    return cred.user;
+  };
+
+  FB.signOutUser = () => signOut(auth);
+
+  FB.fetchTop = async () => {
+    const snap = await get(query(ref(db, 'scores'), orderByChild('score'), limitToLast(10)));
+    const rows = [];
+    snap.forEach(child => { rows.push({ uid: child.key, ...child.val() }); });
+    rows.sort((a, b) => (b.score || 0) - (a.score || 0));
+    return rows;
+  };
+
+  // one entry per player — only their best is ever stored
+  FB.submitScore = async ({score, kills, bestCombo}) => {
+    const uid = FB.user.uid;
+    const r = ref(db, 'scores/' + uid);
+    const existing = await get(r);
+    const prevBest = existing.exists() ? (existing.val().score || 0) : 0;
+    if (score > prevBest){
+      await set(r, {
+        name: (FB.user.displayName || 'NAMELESS LEGEND').slice(0, 16),
+        score, kills, bestCombo,
+        updatedAt: serverTimestamp(),
+      });
+      return { improved: true, best: score };
+    }
+    return { improved: false, best: prevBest };
+  };
+}catch(err){
+  window.TIBBS_UI.setOffline('Firebase failed to load: ' + (err.message || err));
+}
+</script></script>
+</body>
+</html>
